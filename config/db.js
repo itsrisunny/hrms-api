@@ -2,10 +2,10 @@
 const mysql = require("mysql2/promise");
 
 const dbConfig = {
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "hrms_db",
+  host: "162.241.148.253",
+  user: "framequz_hrms",
+  password: "ncl037})bCDz",
+  database: "framequz_hrms",
 };
 
 /*const createUser = async (username, password) => {
