@@ -76,4 +76,52 @@ class SMEController extends Controller
             return response()->json(['message' => 'SME not found or is deleted'], 404);
         }
     }
+
+    public function editSME(Request $request, $id)
+    {
+        $sme = SME::find($id);
+        if (!$sme || $sme->status == 90) {
+            return response()->json(['message' => 'SME not found or is deleted'], 404);
+        }
+
+        $validatedData = $request->validate([
+            'sme_name' => 'sometimes|required|string|max:255',
+            'sme_id' => 'sometimes|required|string|max:255|unique:s_m_e_s,sme_id,' . $id,
+            'sme_phone' => 'sometimes|required|string|max:15',
+            'sme_email' => 'sometimes|required|string|email|max:255|unique:s_m_e_s,sme_email,' . $id,
+            'sme_expertise_area' => 'sometimes|required|string|max:255',
+            'sme_linkedin_profile' => 'nullable|string|max:255',
+            'sme_temporary_email' => 'nullable|string|email|max:255',
+            'sme_temporary_password' => 'nullable|string|max:255',
+            'enable_temporary_values' => 'required|boolean',
+        ]);
+
+        if (!empty($validatedData['sme_temporary_password'])) {
+            $validatedData['sme_temporary_password'] = Hash::make($validatedData['sme_temporary_password']);
+        }
+
+        $sme->update($validatedData);
+
+        return response()->json(['message' => 'SME updated successfully', 'sme' => $sme]);
+    }
+
+    public function getSMEDetail($id)
+    {
+        $sme = SME::find($id);
+        if (!$sme || $sme->status == 90) {
+            return response()->json(['message' => 'SME not found or is deleted'], 404);
+        }
+
+        return response()->json($sme);
+    }
+
+    public function generateNextSMEId()
+    {
+        $lastSME = SME::orderBy('id', 'desc')->first();
+        $lastIdNumber = $lastSME ? intval(substr($lastSME->sme_id, -2)) : 0;
+        $nextIdNumber = str_pad($lastIdNumber + 1, 2, '0', STR_PAD_LEFT);
+        $nextSMEId = 'API-SME-' . $nextIdNumber;
+
+        return response()->json(['next_sme_id' => $nextSMEId]);
+    }
 }

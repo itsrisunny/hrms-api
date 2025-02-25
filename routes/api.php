@@ -31,6 +31,7 @@ Route::post('/carousel-list', [CarouselController::class, 'listActiveCarousels']
 Route::post('/job-functions', [JObPostController::class, 'jobFunctions']);
 Route::post('/apply-on-job', [OnBoardingController::class, 'applyOnJob']);
 Route::get('/autogenerate-job-id', [JObPostController::class, 'autogenerateJobId']);
+Route::get('generate-next-sme-id', [SMEController::class, 'generateNextSMEId']); // Add this line
 //Route::middleware('custom.auth')->get('user', [EmployeeController::class, 'getUser']);
 Route::group(['middleware' => 'auth:api'], function () {
     Route::post('user-detail', [EmployeeController::class, 'getUser']);
@@ -97,4 +98,7 @@ Route::group(['middleware' => 'auth:api'], function () {
     Route::get('all-sme-list', [SMEController::class, 'listAllSMEs']); // Add this line
     Route::delete('delete-sme/{id}', [SMEController::class, 'deleteSME']); // Add this line
     Route::post('toggle-sme-status/{id}', [SMEController::class, 'toggleSMEStatus']); // Add this line
+    Route::post('edit-sme/{id}', [SMEController::class, 'editSME']); // Add this line
+    Route::get('sme-detail/{id}', [SMEController::class, 'getSMEDetail']); // Add this line
+
 });
