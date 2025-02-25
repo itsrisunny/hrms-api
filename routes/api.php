@@ -15,6 +15,7 @@ use App\Http\Controllers\JobList;
 use App\Http\Controllers\JobFunctionController; 
 use App\Http\Controllers\CarouselController;
 use App\Http\Controllers\CMSSettingController;
+use App\Http\Controllers\SMEController;
 
 Route::post('login', [EmployeeController::class, 'login']);
 Route::post('token', [EmployeeController::class, 'token']);
@@ -91,4 +92,9 @@ Route::group(['middleware' => 'auth:api'], function () {
         Route::post('delete/{id}', [CarouselController::class, 'delete']);
     });
     Route::post('cms-settings', [CMSSettingController::class, 'store']);
+    Route::post('add-external-sme', [SMEController::class, 'addExternalSME']); // Add this line
+    Route::get('active-sme-list', [SMEController::class, 'listActiveSMEs']); // Add this line
+    Route::get('all-sme-list', [SMEController::class, 'listAllSMEs']); // Add this line
+    Route::delete('delete-sme/{id}', [SMEController::class, 'deleteSME']); // Add this line
+    Route::post('toggle-sme-status/{id}', [SMEController::class, 'toggleSMEStatus']); // Add this line
 });
