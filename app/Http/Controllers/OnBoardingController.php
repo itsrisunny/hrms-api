@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Mail; // Add this line
 use App\Models\Employee; // Add this line
 use App\Models\JObPost; // Add this line
 use App\Models\InterviewNote;
+use App\Models\ExternalSme; // Add this line
+use App\Models\SME;
+
 class OnBoardingController extends Controller
 {
     //
@@ -27,6 +30,8 @@ class OnBoardingController extends Controller
             'mobile' => 'required|string|max:15',
             'apply_for' => 'required|string|max:255',
             'skills' => 'required|array',
+            'skills.*.name' => 'required|string|max:255', // Add this line
+            'skills.*.level' => 'required|integer|min:1|max:5', // Add this line
             'resume' => 'required|file|mimes:pdf,doc,docx|max:2048',
         ]);
 
@@ -40,7 +45,7 @@ class OnBoardingController extends Controller
         $onBoarding->email = $request->input('email');
         $onBoarding->mobile = $request->input('mobile');
         $onBoarding->apply_for = $request->input('apply_for');
-        $onBoarding->skills = implode(', ', $request->input('skills'));
+        $onBoarding->skills = json_encode($request->input('skills')); // Modify this line
         $onBoarding->resume_path = $filePath;
         $onBoarding->save();
 
@@ -49,10 +54,11 @@ class OnBoardingController extends Controller
 
     public function listOnBoardingRecords()
     {
-        $records = OnBoarding::with(['jobPost', 'interviewSchedule.interviewRounds'])->get()->map(function ($record) {
+        $records = OnBoarding::with(['jobPost', 'interviewSchedule.interviewRounds', 'interviewSchedule.externalSme'])->get()->map(function ($record) {
             $record->applied_on = Carbon::parse($record->created_at)->format('D, d M Y');
             $record->resume_path = url(Storage::url($record->resume_path));
             $record->interview_rounds = $record->interviewSchedule->flatMap->interviewRounds;
+            $record->external_sme = $record->interviewSchedule->flatMap->externalSme; // Add this line
             return $record;
         });
         return response()->json($records);
@@ -84,6 +90,11 @@ class OnBoardingController extends Controller
             'interviewRounds.*.date' => 'required|date',
             'interviewRounds.*.meetingType' => 'required|string|max:255',
             'interviewRounds.*.meetingLink' => 'nullable|string|max:255',
+            'externalSme' => 'array', // Modify this line
+            'externalSme.*.interviewName' => 'required|max:255',
+            'externalSme.*.date' => 'required|date',
+            'externalSme.*.meetingType' => 'required|string|max:255',
+            'externalSme.*.meetingLink' => 'nullable|string|max:255',
         ]);
 
         $interviewSchedule = InterviewSchedule::updateOrCreate(
@@ -135,6 +146,7 @@ class OnBoardingController extends Controller
                     'date' => Carbon::createFromFormat('m/d/Y, h:i A', $round['date'])->format('Y-m-d H:i:s'),
                     'meeting_type' => $round['meetingType'],
                     'meeting_link' => $round['meetingLink'],
+                    'probe_area' => $round['probeArea'], // Add this line
                 ]
             );
 
@@ -166,6 +178,42 @@ class OnBoardingController extends Controller
             }
         }
 
+        // Handle externalSme data
+        if(!empty($request->externalSme)){
+            foreach ($request->externalSme as $sme) {
+                ExternalSme::updateOrCreate(
+                    ['interview_schedule_id' => $interviewSchedule->id, 'round' => $sme['round']],
+                    [
+                        'interview_name' => $sme['interviewName'],
+                        'date' => Carbon::createFromFormat('m/d/Y, h:i A', $sme['date'])->format('Y-m-d H:i:s'),
+                        'meeting_type' => $sme['meetingType'],
+                        'meeting_link' => $sme['meetingLink'],
+                        'probe_area' => $sme['probeArea'],
+                    ]
+                );
+                $smeDetail = SME::find($sme['interviewName']);
+                if($smeDetail){
+                    $interviewScheduleData = [
+                        'candidateName' => $interviewSchedule->name,
+                        'position' => $interviewSchedule->position,
+                        'email' => $interviewSchedule->email,
+                        'mobile' => $interviewSchedule->phone,
+                        'round' => $sme['round'],
+                        'date' => Carbon::parse($sme['date'])->format('d-m-Y h:i A'),
+                        'meetingType' => $sme['meetingType'],
+                        'meetingLink' => $sme['meetingLink'],
+                        'employeeName' => $smeDetail->sme_name,
+                        'employeeEmail' => $smeDetail->sme_email,
+                    ];
+                    // Send email to external SME
+                    Mail::send('emails.interview_schedule', ['interviewSchedule' => (object) $interviewScheduleData], function ($message) use ($smeDetail) {
+                        $message->from('spherehrms@apisod.ai', 'HRMS Portal')
+                                ->to($smeDetail->sme_email)
+                                ->subject('Interview Schedule');
+                    });
+                }
+            }
+        }
         if (!empty($interviewRoundsData) && $dateChanged) {
             // Send email to candidate
             $candidateEmailData = [
@@ -200,7 +248,7 @@ class OnBoardingController extends Controller
             'onBoardingId' => 'required',
         ]);
 
-        $interviewDetails = InterviewSchedule::with(['certifications', 'interviewRounds'])->where('onBoardingId', $request->onBoardingId)->get()->map(function ($interview) {
+        $interviewDetails = InterviewSchedule::with(['certifications', 'interviewRounds', 'externalSme'])->where('onBoardingId', $request->onBoardingId)->get()->map(function ($interview) {
             $interview->interviewRounds->each(function ($round) {
                 $round->interviewNotes = $round->interviewNotes->first();
             });
@@ -217,6 +265,9 @@ class OnBoardingController extends Controller
             'notepad' => 'required|string',
             'updated_by' => 'required',
             'status' => 'required', // Add this line
+            'skills' => 'nullable|array', // Add this line
+            'skills.*.name' => 'required|string|max:255', // Add this line
+            'skills.*.level' => 'required|integer|min:1|max:5', // Add this line
         ]);
 
         $interviewNote = InterviewNote::updateOrCreate(
@@ -228,7 +279,16 @@ class OnBoardingController extends Controller
         InterviewRound::where('id', $request->interviewId)
                       ->update(['status' => $request->status]);
 
-        return response()->json(['message' => 'Notepad data and status updated successfully']);
+        // Save skills if provided
+        if ($request->has('skills')) {
+            $onBoarding = OnBoarding::find($request->onBoardingId);
+            if ($onBoarding) {
+                $onBoarding->skills = json_encode($request->skills); // Modify this line
+                $onBoarding->save();
+            }
+        }
+
+        return response()->json(['message' => 'Notepad data, status, and skills updated successfully']);
     }
     public function reSceduleInterview(Request $request)
     {

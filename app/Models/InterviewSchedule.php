@@ -34,4 +34,9 @@ class InterviewSchedule extends Model
     {
         return $this->belongsTo(OnBoarding::class, 'onBoardingId');
     }
+
+    public function externalSme()
+    {
+        return $this->hasMany(ExternalSme::class, 'interview_schedule_id', 'id');
+    }
 }

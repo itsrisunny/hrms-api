@@ -9,7 +9,7 @@ class InterviewRound extends Model
     use HasFactory;
 
     protected $fillable = [
-        'interview_schedule_id', 'round', 'interview_name', 'date', 'meeting_type', 'meeting_link', 'status'
+        'interview_schedule_id', 'round', 'interview_name', 'date', 'probe_area', 'meeting_type', 'meeting_link', 'status'
     ];
 
     public function interviewSchedule()
