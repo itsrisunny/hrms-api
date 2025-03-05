@@ -364,6 +364,80 @@ class OnBoardingController extends Controller
 
         return response()->json(['message' => 'Interview rescheduled successfully']);
     }
+    public function reSceduleExternalSMEInterview(Request $request)
+    {
+        $this->validate($request, [
+            'interviewId' => 'required',
+            'round' => 'required',
+            'date' => 'required',
+            'interviewName' => 'required', // Add this line
+        ]);
+
+        $interviewRound = ExternalSme::where('interview_schedule_id', $request->interviewId)
+            ->where('round', $request->round)  // Add this line to check the round
+            ->first();
+
+        $dateChanged = $interviewRound && $interviewRound->date != Carbon::parse($request->date)->format('Y-m-d H:i:s');
+        $nameChanged = $interviewRound && $interviewRound->interview_name != $request->interviewName;
+        $meetingTypeChanged = $interviewRound && $interviewRound->meeting_type != $request->meetingType;
+
+        $interviewRound->update([
+            'date' => Carbon::parse($request->date)->format('Y-m-d H:i:s'),
+            'meeting_type' => $request->meetingType,
+            'meeting_link' => $request->meetingLink,
+            'interview_name' => $request->interviewName,
+        ]);
+
+        $smtp = Smtp::first();
+        config(['mail.mailers.smtp.host' => $smtp->host]);
+        config(['mail.mailers.smtp.port' => $smtp->port]);
+        config(['mail.mailers.smtp.username' => $smtp->username]);
+        config(['mail.mailers.smtp.password' => $smtp->password]);
+        config(['mail.mailers.smtp.encryption' => 'tls']);
+
+        if ($dateChanged || $nameChanged || $meetingTypeChanged) {
+            $employee = Employee::find($request->interviewName);
+            $interviewSchedule = InterviewSchedule::find($request->interviewId);
+
+            if ($employee && $interviewSchedule) {
+                $interviewScheduleData = [
+                    'candidateName' => $interviewSchedule->name,
+                    'position' => $interviewSchedule->position,
+                    'email' => $interviewSchedule->email,
+                    'mobile' => $interviewSchedule->phone,
+                    'round' => $request->round,
+                    'date' => Carbon::parse($request->date)->format('d-m-Y h:i A'),
+                    'meetingType' => $request->meetingType,
+                    'meetingLink' => $request->meetingLink,
+                    'employeeName' => $employee->FirstName . " " . $employee->LastName,
+                    'employeeEmail' => $employee->email,
+                ];
+
+                // Send email to interviewer
+                Mail::send('emails.interview_schedule', ['interviewSchedule' => (object) $interviewScheduleData], function ($message) use ($employee) {
+                    $message->from('spherehrms@apisod.ai', 'HRMS Portal')
+                        ->to($employee->email)
+                        ->subject('Interview Rescheduled');
+                });
+
+                // Send email to candidate
+                $candidateEmailData = [
+                    'candidateName' => $interviewSchedule->name,
+                    'position' => $interviewSchedule->position,
+                    'email' => $interviewSchedule->email,
+                    'mobile' => $interviewSchedule->phone,
+                    'interviewRounds' => [$interviewScheduleData],
+                ];
+                Mail::send('emails.candidate_interview_schedule', ['interviewSchedule' => (object) $candidateEmailData], function ($message) use ($interviewSchedule) {
+                    $message->from('spherehrms@apisod.ai', 'HRMS Portal')
+                        ->to($interviewSchedule->email)
+                        ->subject('Your Interview Rescheduled');
+                });
+            }
+        }
+
+        return response()->json(['message' => 'Interview rescheduled successfully']);
+    }
     public function InterviewList(Request $request)
     {
         $this->validate($request, [

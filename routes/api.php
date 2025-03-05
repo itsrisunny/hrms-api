@@ -77,6 +77,7 @@ Route::group(['middleware' => 'auth:api'], function () {
     });
     Route::post('save-note', [OnBoardingController::class, 'saveNotepad']);
     Route::post('re-schedule', [OnBoardingController::class, 'reSceduleInterview']);
+    Route::post('re-schedule-external-sme-interview', [OnBoardingController::class, 'reSceduleExternalSMEInterview']);
     Route::post('interview-list', [OnBoardingController::class, 'InterviewList']);
     
     Route::group(['prefix' => 'job-function'], function () {
