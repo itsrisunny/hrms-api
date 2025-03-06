@@ -242,6 +242,7 @@ class OnBoardingController extends Controller
 
         return response()->json($interviewDetails);
     }
+
     public function individualInterviewDetail(Request $request)
     {
         $this->validate($request, [
@@ -250,13 +251,14 @@ class OnBoardingController extends Controller
 
         $interviewDetails = InterviewSchedule::with(['certifications', 'interviewRounds', 'externalSme'])->where('onBoardingId', $request->onBoardingId)->get()->map(function ($interview) {
             $interview->interviewRounds->each(function ($round) {
-                $round->interviewNotes = $round->interviewNotes->first();
+                $round->interviewNotes = $round->interviewNotes ? $round->interviewNotes->first() : null;
+                $round->externalSMENotes = $round->externalSMENotes ? $round->externalSMENotes->first() : null;
             });
             return $interview;
         });
-
         return response()->json($interviewDetails);
     }
+
     public function saveNotepad(Request $request)
     {
         $this->validate($request, [

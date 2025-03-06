@@ -20,4 +20,8 @@ class ExternalSme extends Model
     {
         return $this->belongsTo(InterviewSchedule::class, 'interview_schedule_id');
     }
+    public function interviewNotes()
+    {
+        return $this->hasMany(ExternalSMENotes::class, 'interviewId', 'id');
+    }
 }
