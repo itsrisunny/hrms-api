@@ -17,6 +17,7 @@ use App\Models\JObPost; // Add this line
 use App\Models\InterviewNote;
 use App\Models\ExternalSme; // Add this line
 use App\Models\SME;
+use App\Models\ExternalSMENotes;
 
 class OnBoardingController extends Controller
 {
@@ -29,9 +30,9 @@ class OnBoardingController extends Controller
             'email' => 'required|email|max:255',
             'mobile' => 'required|string|max:15',
             'apply_for' => 'required|string|max:255',
-            'skills' => 'required|array',
+            /*'skills' => 'required|array',
             'skills.*.name' => 'required|string|max:255', // Add this line
-            'skills.*.level' => 'required|integer|min:1|max:5', // Add this line
+            'skills.*.level' => 'required|integer|min:1|max:5', // Add this line*/
             'resume' => 'required|file|mimes:pdf,doc,docx|max:2048',
         ]);
 
@@ -250,10 +251,14 @@ class OnBoardingController extends Controller
         ]);
 
         $interviewDetails = InterviewSchedule::with(['certifications', 'interviewRounds', 'externalSme'])->where('onBoardingId', $request->onBoardingId)->get()->map(function ($interview) {
+            
             $interview->interviewRounds->each(function ($round) {
                 $round->interviewNotes = $round->interviewNotes ? $round->interviewNotes->first() : null;
-                $round->externalSMENotes = $round->externalSMENotes ? $round->externalSMENotes->first() : null;
+                $round->externalNotes = $round->ExternalSMENotes ? $round->ExternalSMENotes->first() : null;
             });
+           /* $interview->externalSme->each(function ($sme) {
+                $sme->externalSMENotes = $sme->interviewNotes ? $sme->interviewNotes->first() : null;
+            });*/
             return $interview;
         });
         return response()->json($interviewDetails);
@@ -270,25 +275,54 @@ class OnBoardingController extends Controller
             'skills' => 'nullable|array', // Add this line
             'skills.*.name' => 'required|string|max:255', // Add this line
             'skills.*.level' => 'required|integer|min:1|max:5', // Add this line
+            'internal' => 'required|boolean',
         ]);
+        if($request->internal){
+            // If there's an ID, update the existing entry, otherwise, create a new one
+            $interviewNote = InterviewNote::updateOrCreate(
+                ['id' => $request->id], // Use 'id' to identify if it's an update or insert
+                [
+                    'onBoardingId' => $request->onBoardingId,
+                    'interviewId' => $request->interviewId,
+                    'notepad' => $request->notepad,
+                    'updated_by' => $request->updated_by
+                ]
+            );
 
-        $interviewNote = InterviewNote::updateOrCreate(
-            ['onBoardingId' => $request->onBoardingId, 'interviewId' => $request->interviewId],
-            ['notepad' => $request->notepad, 'updated_by' => $request->updated_by]
-        );
+            // Update the status in InterviewRound model
+            InterviewRound::where('id', $request->interviewId)
+                        ->update(['status' => $request->status]);
 
-        // Update the status in InterviewRound model
-        InterviewRound::where('id', $request->interviewId)
-                      ->update(['status' => $request->status]);
+            // Save skills in InterviewNote model if provided
+            if ($request->has('skills')) {
+                // Ensure that the skills are being saved to the InterviewNote model
+                $interviewNote->skills = json_encode($request->skills); // Modify this to store in InterviewNote
+                $interviewNote->save();
+            }
+        }else{
+            // If there's an ID, update the existing entry, otherwise, create a new one
+            $interviewNote = ExternalSMENotes::updateOrCreate(
+                ['id' => $request->id], // Use 'id' to identify if it's an update or insert
+                [
+                    'onBoardingId' => $request->onBoardingId,
+                    'interviewId' => $request->interviewId,
+                    'notepad' => $request->notepad,
+                    'updated_by' => $request->updated_by
+                ]
+            );
 
-        // Save skills if provided
-        if ($request->has('skills')) {
-            $onBoarding = OnBoarding::find($request->onBoardingId);
-            if ($onBoarding) {
-                $onBoarding->skills = json_encode($request->skills); // Modify this line
-                $onBoarding->save();
+            // Update the status in InterviewRound model
+            ExternalSme::where('id', $request->interviewId)
+                        ->update(['status' => $request->status]);
+
+            // Save skills in InterviewNote model if provided
+            if ($request->has('skills')) {
+                // Ensure that the skills are being saved to the InterviewNote model
+                $interviewNote->skills = json_encode($request->skills); // Modify this to store in InterviewNote
+                $interviewNote->save();
             }
         }
+        
 
         return response()->json(['message' => 'Notepad data, status, and skills updated successfully']);
     }

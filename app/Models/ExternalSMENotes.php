@@ -11,4 +11,6 @@ class ExternalSMENotes extends Model
     protected $table = 'external_sme_note';
     protected $primaryKey = 'id';
     public $timestamps = false;
+
+    protected $fillable = ['id', 'onBoardingId', 'interviewId', 'notepad', 'updated_by'];
 }

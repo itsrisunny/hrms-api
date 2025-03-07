@@ -20,4 +20,8 @@ class InterviewRound extends Model
     {
         return $this->hasMany(InterviewNote::class, 'interviewId', 'id');
     }
+    public function externalSMENotes()
+    {
+        return $this->hasMany(ExternalSMENotes::class, 'interviewId', 'id');
+    }
 }
